@@ -31,7 +31,7 @@ gdb command:          Implemented?
 -break-enable         Yes
 -break-info           N.A. (info break NUMBER) (*)
 -break-insert         Yes
--break-list           No (*)
+-break-list           In Progress
 -break-watch          Yes
 @</pre>
 
@@ -133,6 +133,11 @@ void mi_break_watch(mi_h *h, enum mi_wp_mode mode, const char *exp)
     mi_send(h,"-break-watch -%c \"%s\"\n",mode==wm_rw ? 'a' : 'r',exp);
 }
 
+void mi_break_list(mi_h *h)
+{
+    mi_send(h, "-break-list\n");
+}
+
 /* High level versions. */
 
 /**[txh]********************************************************************
@@ -145,6 +150,12 @@ void mi_break_watch(mi_h *h, enum mi_wp_mode mode, const char *exp)
 error.
   
 ***************************************************************************/
+
+mi_results *gmi_break_list(mi_h *h)
+{
+ mi_break_list(h);
+ return mi_res_done_var(h,"BreakpointTable");
+}
 
 mi_bkpt *gmi_break_insert(mi_h *h, const char *file, int line)
 {

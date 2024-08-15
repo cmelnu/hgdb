@@ -631,6 +631,8 @@ int gmi_break_state(mi_h *h, int number, int enable);
 /* Set a watchpoint. It doesn't work for remote targets! */
 mi_wp *gmi_break_watch(mi_h *h, enum mi_wp_mode mode, const char *exp);
 
+mi_results *gmi_break_list(mi_h *h);
+
 /* Data Manipulation. */
 /* Evaluate an expression. Returns a parsed tree. */
 char *gmi_data_evaluate_expression(mi_h *h, const char *expression);

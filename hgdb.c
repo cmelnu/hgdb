@@ -38,7 +38,7 @@ int while_wait_for_stop(){
 	if (!wait_for_stop(h))
 	{
 		mi_disconnect(h);
-		return 1;
+		return -1;
 	}
 }
 
@@ -107,7 +107,7 @@ int run_executable(){
 	{
 		printf("Error when running executable file!\n");
 		mi_disconnect(h);
-		return 1;
+		return -1;
 	}
 }
 
@@ -124,7 +124,7 @@ int cont_executable(){
         {
 	       printf("Error when continuing program execution!\n");
 	       mi_disconnect(h);
-	       return 1;
+	       return -1;
         }
 }
 
@@ -203,10 +203,10 @@ int set_executable(){
 	{
 		printf("Error setting executable file and args\n");
 		mi_disconnect(h);
-		return 1;
+		return -1;
 	}
 
-	breakpoint_main();
+	//breakpoint_main();
 }
 
 /********************
@@ -237,8 +237,22 @@ int set_breakpoint(char *command){
 	bk=gmi_break_insert(h,getenv("SOURCE_PATH"),lineno);
 	if (!bk){
 		printf("Error setting breakpoint\n");
-		return 1;
+		return -1;
 	}
+}
+
+int list_breakpoints () 
+{
+	printf("Entro aquí \n");
+	mi_results* r = gmi_break_list(h);
+
+	if(!r){
+		printf("No se ha devuelto ninguna lista de breakpoints\n");
+		return -1;
+	}
+		
+	parse_break_list(r);
+
 }
 
 /********************
@@ -318,11 +332,11 @@ void clear_data_structures(){
 }
 
 /********************
-parse
+parse_local_vars_list
 
 -Parses the data structure containing the results in response to a GDB query
 ********************/
-void parse(mi_results *r){
+void parse_local_vars_list(mi_results *r){
 		
 	mi_results * a = NULL;
 	mi_results * aux = NULL;
@@ -349,33 +363,90 @@ void parse(mi_results *r){
 
 	//We start navigating through the tree.. until we find a NULL node
 	while( r != NULL ){
-			//We save the root node, because we will need it later on
-			aux = r;
-			//For the current root node, we obtain its first child node
-			a = r->v.rs;
-			//For each child node, there is a list which contains the data we want
-			while ( a != NULL ){
-				if (strcmp(a->var,"name") == 0){ printf("	%s	", a->v.cstr);
-						strcpy(results[ptr_results].name, a->v.cstr);}
-				else if (strcmp(a->var,"type") == 0) { printf("%s	", a->v.cstr);
-						strcpy(results[ptr_results].type, a->v.cstr);}
-				else if (strcmp(a->var,"value") == 0) { printf("%s\n", a->v.cstr);
-						strcpy(results[ptr_results].value, a->v.cstr);}
 
-				k++;
+		//We save the root node, because we will need it later on
+		aux = r;
 
-				if (k % 3 == 0 && k != 0){
-					strcpy(results[ptr_results].func, fr->func);
-					strcpy(results[ptr_results].file, fr->file);
-					results[ptr_results].line = (int)fr->line;
-					ptr_results++;
-					k = 0;
-				}
-				a = a->next;
+		//For the current root node, we obtain its first child node
+		a = r->v.rs;
+
+		//For each child node, there is a list which contains the data we want
+		while ( a != NULL ){
+			
+			if (strcmp(a->var,"name") == 0){ printf("	%s	", a->v.cstr);
+					strcpy(results[ptr_results].name, a->v.cstr);}
+			else if (strcmp(a->var,"type") == 0) { printf("%s	", a->v.cstr);
+					strcpy(results[ptr_results].type, a->v.cstr);}
+			else if (strcmp(a->var,"value") == 0) { printf("%s\n", a->v.cstr);
+					strcpy(results[ptr_results].value, a->v.cstr);}
+
+			k++;
+
+			if (k % 3 == 0 && k != 0){
+				strcpy(results[ptr_results].func, fr->func);
+				strcpy(results[ptr_results].file, fr->file);
+				results[ptr_results].line = (int)fr->line;
+				ptr_results++;
+				k = 0;
 			}
-			//After navigating through all the current root node's child nodes, we get back to the root node and go to the next root node
-			r = aux;
+			a = a->next;
+		}
+		//After navigating through all the current root node's child nodes, we get back to the root node and go to the next root node
+		r = aux;
+		r = r->next;
+	}
+}
+
+/********************
+parse_break_list
+
+-Parses the data structure containing a list of breakpoints in response to a GDB query
+********************/
+void parse_break_list(mi_results *r){
+		
+	mi_results * a = NULL;
+	mi_results * aux_bk = NULL;
+	mi_results * body_node = NULL;
+
+	int i = 0;
+	int j = 0;
+	int k = 0;
+
+
+	printf("First node = %s\n", r->var);
+
+	r = r->v.rs;
+
+	while(r->next != NULL){
+		printf("Node before hdr = %s \n", r->var);
+		r = r->next;
+	}
+
+	//This aux stores the body node. The body contains a chain of breakpoints 
+	body_node = r;
+
+	//The first breakpoint node to be analysed
+	aux_bk = r->v.rs;
+
+	while (r != NULL && aux_bk != NULL){
+
+		//First field of the first breakpoint, 'number'
+		r = aux_bk->v.rs;
+
+		printf("First field of the current breakpoint =	%s %s \n", r->var, r->v.cstr);
+
+		while(r->next != NULL){
+
+			printf("Breakpoint field = %s and value = %s\n", r->var, r->v.cstr);
 			r = r->next;
+		}
+
+		//Now r points to the next breakpoint
+		r = aux_bk->next;
+
+		//Aux_bk points to the next breakpoint
+		aux_bk = aux_bk->next;
+		
 	}
 }
 
@@ -399,7 +470,7 @@ int print_locals(){
 
 	printf("\n \n Local variables (name, type, value): \n \n");
 	//After obtaining the list, we perform some kind of parsing which allows us to obtain some info about the variables (names,values,types)
-	parse(r);
+	parse_local_vars_list(r);
 	free(r);
 }
 
@@ -692,6 +763,7 @@ void print_help(){
 	printf("-break [line]	:	set a breakpoint at a certain line of the source code\n");
 	printf("-step		:	execute a line of source code\n");
 	printf("-run		:	execute the whole program until the end or until a breakpoint is found\n");
+	printf("-cont		:	continue the execution of a program from the point where its execution was stopped until a breakpoint is found\n");
 	printf("-frame		:	get info about the current stack frame\n");
 	printf("-locals		:	show local variables at a certain point of execution (a breakpoint)\n");
 	printf("-curstate	:	show info about the current state of the program\n");
@@ -742,6 +814,9 @@ int hgdb_execution(){
 			}
 			else if (strstr(line,"break") != NULL){
 		 		set_breakpoint(line);
+			}
+			else if (strstr(line, "lb") != NULL){
+				list_breakpoints();
 			}
 			else if (strcmp(line,"step\n") == 0){
 				step_executable();
@@ -806,16 +881,19 @@ int main(){
 		if (!h)
 		{
 			printf("Connect failed\n");
-			return 1;
+			return -1;
 		}
 		printf("Connected to gdb!\n");
 
 		//Set all callbacks
 		mi_set_from_gdb_cb(h,cb_from,NULL);
+
 		//Init all the necessary data structures for the debugger
 		init_data_structures();	
+
 		//Set the executable file to run and debug
 		set_executable();
+
 		//At this point, the debugger starts its execution
 		hgdb_execution();
 

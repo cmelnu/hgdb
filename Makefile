@@ -1,27 +1,16 @@
+FLAGS= -g
 
-dbg:	
-	gcc -w -g -o hgdb hgdb.c stub/stub.c hwdebug/hwdebug.c -lmigdb -fcommon
+OBJECTS= hwdebug/hwdebug.o stub/stub.o
 
-tests:
-	gcc -g -o examples/vars.out examples/vars.c
-	gcc -g -o examples/suma.out examples/suma.c
 
-suma:
-	gcc -g -O0 -o examples/suma.out examples/suma.c
+all: ${OBJECTS}
+	gcc -w $(FLAGS) -o hgdb hgdb.c ${OBJECTS} -lmigdb -fcommon
 
-vars:
-	gcc -g -o examples/vars.out examples/vars.c
+hwdebug/hwdebug.o:hwdebug/hwdebug.c
+	gcc $(FLAGS) hwdebug/hwdebug.c -c -o hwdebug/hwdebug.o
 
-exec:
-	make
-	./hgdb
-
-val:
-	make
-	valgrind --leak-check=full --show-leak-kinds=all ./hgdb
+stub/stub.o:stub/stub.c
+	gcc $(FLAGS) stub/stub.c -c -o stub/stub.o
 
 clean:
-	rm -rf hgdb *~ examples/*.out examples/*~
-
-targets:	
-	@echo "all exec val clean"
+	rm -rf hgdb *~ examples/*~ hwdebug/*.o stub/*.o

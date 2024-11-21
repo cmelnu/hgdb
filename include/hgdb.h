@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <string.h>
+#include "stub.h"
 #include "error.h"
-#include "parse.h"
 #include "mi_gdb.h"
 
 

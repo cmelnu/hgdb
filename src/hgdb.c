@@ -1,4 +1,4 @@
-#include "stub.h"
+#include "hgdb.h"
 
 /********************
 GLOBAL VARIABLES
@@ -9,6 +9,12 @@ GLOBAL VARIABLES
 
 save_results *results;
 int ptr_results = 0;
+
+
+//Functions and data structures coming from outside (see stub.c)
+extern addrmap suma_addrmap[];
+extern int create_stub(int ptr_results, save_results *results);
+extern char *get_varname(char *command);
 
 
 void cb_from(const char *str, void *data)
@@ -26,7 +32,6 @@ int while_wait_for_stop(){
 	
 	if (!wait_for_stop(h))
 	{
-		hgdb_error(__func__, "Failed to wait for stop");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -41,12 +46,17 @@ int wait_for_stop (){
 	usleep(1000);
 	/* The end of the async. */
 	sr=mi_res_stop(h);
-
-	if (sr)
-		mi_free_stop(sr);
-	else
-		res=0;
-
+		if (sr)
+		{
+			//printf("Stopped, reason: %s\n",mi_reason_enum_to_str(sr->reason));
+			mi_free_stop(sr);
+		}
+		else
+		{
+			//printf("Error while waiting\n");
+			//printf("mi_error: %d\nmi_error_from_gdb: %s\n",mi_error,mi_error_from_gdb);
+			res=0;
+		}
 	return res;
 }
 
@@ -90,7 +100,7 @@ int run_executable(){
 	
 	if (!gmi_exec_run(h))
 	{
-		hgdb_error(__func__, "Error when running executable file!");
+		printf("Error when running executable file!\n");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -107,7 +117,7 @@ int cont_executable(){
 
 	if (!gmi_exec_continue(h))
         {
-	       hgdb_error(__func__, "Error when continuing program execution!");
+	       printf("Error when continuing program execution!\n");
 	       mi_disconnect(h);
 	       return -1;
         }
@@ -173,6 +183,8 @@ int exit_hgdb(){
 
 }
 
+/*
+
 
 /********************
 set_executable
@@ -184,7 +196,7 @@ int set_executable(){
 	// Set the child name and the command line aguments.
 	if (!gmi_set_exec(h,getenv("EXEC_PATH"),""))
 	{
-		hgdb_error(__func__, "Error setting executable file and args");
+		printf("Error setting executable file and args\n");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -230,7 +242,7 @@ int list_breakpoints ()
 	mi_results* r = gmi_break_list(h);
 
 	if(!r){
-		hgdb_error(__func__, "No se ha devuelto ninguna lista de breakpoints");
+		printf("No se ha devuelto ninguna lista de breakpoints\n");
 		return -1;
 	}
 		
@@ -250,7 +262,7 @@ void print_frame()
  	mi_frames *f = gmi_stack_info_frame(h);
 
  	if(!f){
-  	    hgdb_error(__func__, "Error! empty frames info. The executable/source file has not been set yet");
+  	    printf("Error! empty frames info. The executable/source file has not been set yet\n");
   	    return;
   	}
 
@@ -314,6 +326,7 @@ void clear_data_structures(){
 	init_data_structures();
 }
 
+
 /********************
 print_locals
 
@@ -326,7 +339,7 @@ int print_locals(){
 	r = gmi_stack_list_locals(h, 2);
 
 	if (!r){
-		hgdb_error(__func__, "Could not list local variables. The executable/source file has not been set yet");
+		printf("Could not list local variables. The executable/source file has not been set yet \n");
 		return -1;
 	}
 
@@ -362,7 +375,7 @@ int detect_main(){
 	
 	//Here, we try to open our program's source file
 	if((fp = fopen(getenv("SOURCE_PATH"), "r")) == NULL) {
-		hgdb_error(__func__, "The source file could not be open");
+		printf("The source file could not be open \n");
 		return (-1);
 	}
 
@@ -430,6 +443,7 @@ void trace_executable(){
 }
 
 
+
 /********************
 check_env
 
@@ -442,7 +456,7 @@ void check_env(){
 	char *source_path = getenv("SOURCE_PATH");
 
 	if( exec_path == NULL || source_path == NULL ){
-		hgdb_error(__func__, "Either one of these variables has not been specified:  exec_path, SOURCE_PATH\nPlease run '. ./config.sh' without arguments for further details\n");
+		printf("Either one of these variables has not been specified:  exec_path, SOURCE_PATH\nPlease run '. ./config.sh' without arguments for further details\n");
 		exit(1);
 	}
 }
@@ -517,6 +531,9 @@ int hgdb_execution(){
     int end = 0;
 
 	printf("\n\nWELCOME TO HGDB!\n");
+	printf("Author: Christian Meléndez Núñez\n");
+	printf("Director: Daniel Jimenez-Gonzalez\n");
+	printf("2018, Universitat Politècnica de Catalunya\n\n");
 
 	print_help();
 
@@ -597,7 +614,7 @@ int main(){
 		h=mi_connect_local();
 		if (!h)
 		{
-			hgdb_error(__func__, "Connect failed\n");
+			printf("Connect failed\n");
 			return -1;
 		}
 		printf("Connected to gdb!\n");

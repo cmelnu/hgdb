@@ -1,7 +1,13 @@
+// hgdb.h
+#ifndef HGDB_H
+#define HGDB_H
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <string.h>
+#include "error.h"
+#include "parse.h"
 #include "mi_gdb.h"
 
 
@@ -24,3 +30,4 @@ mi_wp *wp;
 mi_h *h;
 mi_frames *fr;
 
+#endif // HGDB_H

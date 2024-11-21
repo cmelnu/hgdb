@@ -1,0 +1,55 @@
+# Doxyfile.in
+# Doxygen configuration file for the hgdb project
+
+# Project related configuration options
+PROJECT_NAME           = hgdb
+PROJECT_BRIEF          = "A brief description of the hgdb project"
+PROJECT_LOGO           = 
+OUTPUT_DIRECTORY       = docs/
+CREATE_SUBDIRS         = YES
+HTML_OUTPUT            = html
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_RTF           = NO
+GENERATE_XML           = NO
+GENERATE_MAN           = NO
+GENERATE_DOCSET        = NO
+GENERATE_CHM           = NO
+GENERATE_PDF           = NO
+
+# Input files
+INPUT                  = ${CMAKE_CURRENT_SOURCE_DIR}/src
+FILE_PATTERNS         = *.c *.h
+RECURSIVE             = YES
+
+# Source browsing
+STRIP_FROM_PATH       = src/
+STRIP_FROM_INC_PATH   = include/
+
+# Output options
+HTML_HEADER            = 
+HTML_FOOTER            = 
+HTML_EXTRA_STYLESHEET  = 
+HTML_COLORSTYLE        = 
+HTML_TIMESTAMP         = YES
+
+# Doxygen options
+GENERATE_TREEVIEW      = YES
+ALIASES                = 
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+EXTRACT_LOCAL_METHODS  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_FRIENDS           = NO
+HIDE_IN_BODY_DOCS      = NO
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = 
+STRIP_FROM_INC_PATH    = 
+
+# Additional options
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+SKIP_FUNCTION_MACROS    = NO

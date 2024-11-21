@@ -1,9 +1,4 @@
-
-#include "stub/stub.h"
-#include "hwdebug/hwdebug.h"
-
-
-
+#include "stub.h"
 
 /********************
 GLOBAL VARIABLES
@@ -14,12 +9,6 @@ GLOBAL VARIABLES
 
 save_results *results;
 int ptr_results = 0;
-
-
-//Functions and data structures coming from outside (see stub.c)
-extern addrmap suma_addrmap[];
-extern int create_stub(int ptr_results, save_results *results);
-extern char *get_varname(char *command);
 
 
 void cb_from(const char *str, void *data)
@@ -37,6 +26,7 @@ int while_wait_for_stop(){
 	
 	if (!wait_for_stop(h))
 	{
+		hgdb_error(__func__, "Failed to wait for stop");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -51,17 +41,12 @@ int wait_for_stop (){
 	usleep(1000);
 	/* The end of the async. */
 	sr=mi_res_stop(h);
-		if (sr)
-		{
-			//printf("Stopped, reason: %s\n",mi_reason_enum_to_str(sr->reason));
-			mi_free_stop(sr);
-		}
-		else
-		{
-			//printf("Error while waiting\n");
-			//printf("mi_error: %d\nmi_error_from_gdb: %s\n",mi_error,mi_error_from_gdb);
-			res=0;
-		}
+
+	if (sr)
+		mi_free_stop(sr);
+	else
+		res=0;
+
 	return res;
 }
 
@@ -105,7 +90,7 @@ int run_executable(){
 	
 	if (!gmi_exec_run(h))
 	{
-		printf("Error when running executable file!\n");
+		hgdb_error(__func__, "Error when running executable file!");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -122,7 +107,7 @@ int cont_executable(){
 
 	if (!gmi_exec_continue(h))
         {
-	       printf("Error when continuing program execution!\n");
+	       hgdb_error(__func__, "Error when continuing program execution!");
 	       mi_disconnect(h);
 	       return -1;
         }
@@ -188,8 +173,6 @@ int exit_hgdb(){
 
 }
 
-/*
-
 
 /********************
 set_executable
@@ -201,7 +184,7 @@ int set_executable(){
 	// Set the child name and the command line aguments.
 	if (!gmi_set_exec(h,getenv("EXEC_PATH"),""))
 	{
-		printf("Error setting executable file and args\n");
+		hgdb_error(__func__, "Error setting executable file and args");
 		mi_disconnect(h);
 		return -1;
 	}
@@ -247,7 +230,7 @@ int list_breakpoints ()
 	mi_results* r = gmi_break_list(h);
 
 	if(!r){
-		printf("No se ha devuelto ninguna lista de breakpoints\n");
+		hgdb_error(__func__, "No se ha devuelto ninguna lista de breakpoints");
 		return -1;
 	}
 		
@@ -267,7 +250,7 @@ void print_frame()
  	mi_frames *f = gmi_stack_info_frame(h);
 
  	if(!f){
-  	    printf("Error! empty frames info. The executable/source file has not been set yet\n");
+  	    hgdb_error(__func__, "Error! empty frames info. The executable/source file has not been set yet");
   	    return;
   	}
 
@@ -332,127 +315,6 @@ void clear_data_structures(){
 }
 
 /********************
-parse_local_vars_list
-
--Parses the data structure containing the results in response to a GDB query
-********************/
-void parse_local_vars_list(mi_results *r){
-		
-	mi_results * a = NULL;
-	mi_results * aux = NULL;
-	mi_frames *fr = NULL;
-
-	int i = 0;
-	int j = 0;
-	int k = 0;
-
-	//Before navigating through the tree, we get its first node
-	r = r->v.rs;
-
-	fr = gmi_stack_info_frame(h);
-
- 	if(!fr){
-  	    printf("Error! empty frames info. The executable/source file has not been set yet\n");
-  	    return;
-  	}
-
-	//In case the debugger jumps to a source line not belonging to our source file, skip it
-	if (strcmp(fr->file, getenv("SOURCE_PATH")) != 0){
-		return;
-	}
-
-	//We start navigating through the tree.. until we find a NULL node
-	while( r != NULL ){
-
-		//We save the root node, because we will need it later on
-		aux = r;
-
-		//For the current root node, we obtain its first child node
-		a = r->v.rs;
-
-		//For each child node, there is a list which contains the data we want
-		while ( a != NULL ){
-			
-			if (strcmp(a->var,"name") == 0){ printf("	%s	", a->v.cstr);
-					strcpy(results[ptr_results].name, a->v.cstr);}
-			else if (strcmp(a->var,"type") == 0) { printf("%s	", a->v.cstr);
-					strcpy(results[ptr_results].type, a->v.cstr);}
-			else if (strcmp(a->var,"value") == 0) { printf("%s\n", a->v.cstr);
-					strcpy(results[ptr_results].value, a->v.cstr);}
-
-			k++;
-
-			if (k % 3 == 0 && k != 0){
-				strcpy(results[ptr_results].func, fr->func);
-				strcpy(results[ptr_results].file, fr->file);
-				results[ptr_results].line = (int)fr->line;
-				ptr_results++;
-				k = 0;
-			}
-			a = a->next;
-		}
-		//After navigating through all the current root node's child nodes, we get back to the root node and go to the next root node
-		r = aux;
-		r = r->next;
-	}
-}
-
-/********************
-parse_break_list
-
--Parses the data structure containing a list of breakpoints in response to a GDB query
-********************/
-void parse_break_list(mi_results *r){
-		
-	mi_results * a = NULL;
-	mi_results * aux_bk = NULL;
-	mi_results * body_node = NULL;
-
-	int i = 0;
-	int j = 0;
-	int k = 0;
-
-
-	printf("First node = %s\n", r->var);
-
-	r = r->v.rs;
-
-	while(r->next != NULL){
-		printf("Node before hdr = %s \n", r->var);
-		r = r->next;
-	}
-
-	//This aux stores the body node. The body contains a chain of breakpoints 
-	body_node = r;
-
-	//The first breakpoint node to be analysed
-	aux_bk = r->v.rs;
-
-	while (r != NULL && aux_bk != NULL){
-
-		//First field of the first breakpoint, 'number'
-		r = aux_bk->v.rs;
-
-		printf("First field of the current breakpoint =	%s %s \n", r->var, r->v.cstr);
-
-		while(r->next != NULL){
-
-			printf("Breakpoint field = %s and value = %s\n", r->var, r->v.cstr);
-			r = r->next;
-		}
-
-		//Now r points to the next breakpoint
-		r = aux_bk->next;
-
-		//Aux_bk points to the next breakpoint
-		aux_bk = aux_bk->next;
-		
-	}
-}
-
-
-
-/********************
 print_locals
 
 -Obtain the local variables and other relevant information related to them
@@ -464,7 +326,7 @@ int print_locals(){
 	r = gmi_stack_list_locals(h, 2);
 
 	if (!r){
-		printf("Could not list local variables. The executable/source file has not been set yet \n");
+		hgdb_error(__func__, "Could not list local variables. The executable/source file has not been set yet");
 		return -1;
 	}
 
@@ -500,7 +362,7 @@ int detect_main(){
 	
 	//Here, we try to open our program's source file
 	if((fp = fopen(getenv("SOURCE_PATH"), "r")) == NULL) {
-		printf("The source file could not be open \n");
+		hgdb_error(__func__, "The source file could not be open");
 		return (-1);
 	}
 
@@ -567,148 +429,6 @@ void trace_executable(){
 	
 }
 
-int set_hw_debug(){
-
-	run_executable();
-	while_wait_for_stop();
-	trace_executable();
-	run_executable();
-	while_wait_for_stop();
-	create_stub(ptr_results, results);
-
-}
-
-int hw_debug(){
-
-	int i;
-	char aux[40];
-	char aux_d[40];
-	char *line = NULL;
-	ssize_t bufsize = 0;
-	int size = 0;
-	int end = 0;
-	int states = 0;
-	mi_frames *fr = NULL;
-
-	//At the beginning, we print out the help 
-	print_hw_help();
-	
-	//Here, we run the program for the first time in order to obtain an execution trace (used when creating the stub)
-	//run_executable();
-	//while_wait_for_stop();
-	
-	//We obtain an execution trace
-	//trace_executable();
-
-	//We reload the program in order to start at the beginning of the main() function
-	//run_executable();
-	//while_wait_for_stop();
-
-	//In order to align the program's execution with the hardware's execution, we perform a single step.
-	//step_executable();
-		
-	//We create the stub and all necessary data structures
-        //create_stub(ptr_results, results);
-
-	//hw_debug_step(get_in_addr());
-
-	set_hw_debug();
-	//step_executable();
-	//hw_debug_step(get_in_addr());
-
-	while(end == 0){
-
-		printf ("hwdebug > ");
-		size = getline(&line, &bufsize, stdin);
-
-		if (strcmp(line,"\n") != 0){
-			if (strcmp(line,"help\n") == 0){
-		 		print_hw_help();
-			}
-			//In case we perform a step...
-			else if (strcmp(line,"step\n") == 0){
-				 //We obtain the number of current source line
-				 fr = gmi_stack_info_frame(h);
-			 	 if(!fr){
-			  	        printf("Error! empty frames info. The executable/source file has not been set yet\n");
-			  	        return;
-			  	 }
-				//Since we want to avoid stepping to other source files (such as libraries), we make sure the current line belongs to our current source file
-				 if (strcmp(fr->file, getenv("SOURCE_PATH")) == 0){
-					 //We perform a step within the source file
-					 step_executable();
-					 //Next, we check out how many times we have to step into the hardware's execution
-					 states = how_many_states();
-					 //Finally, we perform as many steps as necessary (within the hardware)
-					 for(i = 0; i < states; i++)
-			 		 	hw_debug_step(get_in_addr());
-
-					 printf("Hardware step performed\n");
-				 }
-			}
-			else if (strstr(line,"read") != NULL){
-
-				fr = gmi_stack_info_frame(h);
-				if(!fr){
-					printf("Error! empty frames info. The executable/source file has not been set yet\n");
-					return;
-				}
-				 /*We want to check out that the hardware's version of a variable has the same value 
-				     as the source code's variable at a certain point of execution */
-				 strcpy(aux, line);
-				 strcpy(aux_d, line);
-		 		 unsigned res = hw_debug_read(get_var_id(line), get_var_addr(aux), get_var_id_addr(), get_in_addr(), get_out_addr());
-                                
-				strtok(aux_d, " ");
-				char *varname = strtok(NULL, " ");
-
-				char *pos;
-				if ((pos = strchr(varname, '\n')) != NULL)
-					*pos = '\0';
-
- 
-				//printf("Variable to read = %s \n", varname);
-
-				int line = (int)fr->line;
-
-				for(i = 0; i < ptr_results; i++){
-					if(strcmp(results[i].name,varname) == 0 && results[i].line == line ){
-						printf("Ok, var name %s and line %d state found, the var has value %s \n", varname, line, results[i].value);
-						if ((int)res != atoi(results[i].value))
-							printf("DISCREPANCY DETECTED!\n");
-					}
-				}
-
-
-			}
-			else if (strcmp(line, "restart\n") == 0){
-				/* Restarting consists of restarting the program, clearing all data structures and restarting the harware */
-				
-				//run_executable();
-				//while_wait_for_stop();
-				//clear_data_structures();
-				//trace_executable();
-				//step_executable();
-				hw_debug_restart(get_in_addr());
-				set_hw_debug();
-				//step_executable();
-				//hw_debug_step(get_in_addr());
-				
-				
-			}
-			else if (strcmp(line, "curstate\n") == 0){
-				current_state_info();
-			}
-			else if (strcmp(line, "hwinfo\n") == 0){
-				hardware_info();
-			}
-			else if (strcmp(line,"exit\n") == 0){
-				return 0;
-			}
-		}//end if
-	}//end while
-
-}
 
 /********************
 check_env
@@ -722,7 +442,7 @@ void check_env(){
 	char *source_path = getenv("SOURCE_PATH");
 
 	if( exec_path == NULL || source_path == NULL ){
-		printf("Either one of these variables has not been specified:  exec_path, SOURCE_PATH\nPlease run '. ./config.sh' without arguments for further details\n");
+		hgdb_error(__func__, "Either one of these variables has not been specified:  exec_path, SOURCE_PATH\nPlease run '. ./config.sh' without arguments for further details\n");
 		exit(1);
 	}
 }
@@ -797,9 +517,6 @@ int hgdb_execution(){
     int end = 0;
 
 	printf("\n\nWELCOME TO HGDB!\n");
-	printf("Author: Christian Meléndez Núñez\n");
-	printf("Director: Daniel Jimenez-Gonzalez\n");
-	printf("2018, Universitat Politècnica de Catalunya\n\n");
 
 	print_help();
 
@@ -845,7 +562,7 @@ int hgdb_execution(){
 			 	trace_executable();
 			}
 			else if (strcmp(line,"hwdebug\n") == 0){
-			 	hw_debug();
+			 	// hw_debug();
 			}
 			else if (strcmp(line,"reload\n") == 0){
 			 	reload_hgdb();
@@ -880,7 +597,7 @@ int main(){
 		h=mi_connect_local();
 		if (!h)
 		{
-			printf("Connect failed\n");
+			hgdb_error(__func__, "Connect failed\n");
 			return -1;
 		}
 		printf("Connected to gdb!\n");

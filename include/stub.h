@@ -1,5 +1,5 @@
 
-#include "../hgdb.h"
+#include "hgdb.h"
 
 
 struct FSM_states_struct{

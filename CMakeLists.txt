@@ -1,3 +1,4 @@
+
 # Specify the minimum version of CMake required
 cmake_minimum_required(VERSION 3.10)
 
@@ -7,6 +8,28 @@ project(hgdb C)
 # Set compiler flags: debug symbols, no optimization, suppress warnings, and allow common symbols
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -O0 -w -fcommon")
 
+# ExternalProject for libmigdb
+include(ExternalProject)
+ExternalProject_Add(libmigdb_ext
+    GIT_REPOSITORY https://github.com/cmelnu/libmigdb.git
+    GIT_TAG main
+    PREFIX ${CMAKE_BINARY_DIR}/libmigdb
+    UPDATE_COMMAND ""
+    CONFIGURE_COMMAND ""          # No configure step (plain Make project)
+    BUILD_IN_SOURCE 1               # Build inside cloned tree
+    BUILD_COMMAND ${CMAKE_MAKE_PROGRAM} -C src
+    INSTALL_COMMAND ""             # No separate install phase needed
+)
+
+# Obtain the source dir of the external project and create an imported target
+ExternalProject_Get_Property(libmigdb_ext SOURCE_DIR)
+set(LIBMIGDB_SOURCE_DIR ${SOURCE_DIR})
+set(LIBMIGDB_LIB ${LIBMIGDB_SOURCE_DIR}/src/libmigdb.a)
+
+add_library(migdb STATIC IMPORTED GLOBAL)
+set_target_properties(migdb PROPERTIES IMPORTED_LOCATION ${LIBMIGDB_LIB})
+add_dependencies(migdb libmigdb_ext)
+
 # Define the source files for the project, now located in src/ folder
 set(SOURCES
     src/hgdb.c
@@ -15,66 +38,22 @@ set(SOURCES
     src/utils.c
 )
 
-# Include directories for header files
+# Include directories for header files (project + installed libmigdb headers)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+# Headers from external project (directly from its src folder where mi_gdb.h lives)
+include_directories(${LIBMIGDB_SOURCE_DIR}/src)
 
 # Create an executable named 'hgdb' from the specified source files
 add_executable(hgdb ${SOURCES})
 
-# Link the 'migdb' library to the 'hgdb' executable
+# Also add target-specific include directories (modern CMake style)
+target_include_directories(hgdb PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${LIBMIGDB_SOURCE_DIR}/src)
+
+# Add dependency so hgdb builds after libmigdb_ext
+add_dependencies(hgdb libmigdb_ext)
+
+# Path to the installed static library
 target_link_libraries(hgdb migdb)
 
-# Define a custom 'clean-all' target that runs a CMake script
-add_custom_target(clean-all
-    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_clean.cmake
-)
-
-# Generate a custom cmake_clean.cmake file with cleaning instructions
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmake_clean.cmake
-"
-# Remove build artifacts
-file(REMOVE_RECURSE
-    \${CMAKE_BINARY_DIR}/hgdb
-    \${CMAKE_BINARY_DIR}/CMakeFiles
-    \${CMAKE_BINARY_DIR}/CMakeCache.txt
-    \${CMAKE_BINARY_DIR}/cmake_install.cmake
-    \${CMAKE_BINARY_DIR}/Makefile
-)
-
-# Find and remove additional files (backups and object files)
-file(GLOB_RECURSE EXTRA_FILES
-    \${CMAKE_SOURCE_DIR}/src/*~
-    \${CMAKE_SOURCE_DIR}/src/examples/*~
-    \${CMAKE_SOURCE_DIR}/src/stub/*.o
-    \${CMAKE_SOURCE_DIR}/src/*.o
-)
-
-if(EXTRA_FILES)
-    file(REMOVE \${EXTRA_FILES})
-endif()
-")
-
-# first we can indicate the documentation build as an option and set it to ON by default
-option(BUILD_DOCS "Build documentation" ON)
-
-# look for Doxygen package
-find_package(Doxygen)
-
-if (DOXYGEN_FOUND)
-    # set input and output files
-    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in)
-    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.out)
-
-    # request to configure the file
-    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
-    message("Doxygen build started")
-
-    # Note: do not put "ALL" - this builds docs together with application EVERY TIME!
-    add_custom_target( docs
-        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        COMMENT "Generating API documentation with Doxygen"
-        VERBATIM )
-else (DOXYGEN_FOUND)
-  message("Doxygen need to be installed to generate the doxygen documentation")
-endif (DOXYGEN_FOUND)
+# Link the built migdb library
+target_link_libraries(hgdb ${LIBMIGDB_LIB})
